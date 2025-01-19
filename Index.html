@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PlanHaus: Minimalist Yearly Planner</title>
+  <meta name="description" content="PlanHaus is a minimalist, dark-themed yearly planner. Organize tasks across multiple years, track weekly progress, and store everything locally.">
+  <style>
+    /* Global Styles */
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #121212;
+      color: #ffffff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    h1 {
+      margin: 20px 0;
+      font-size: 2rem;
+      color: #4caf50;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      background-color: #333;
+      color: #fff;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #4caf50;
+    }
+
+    .year-controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .year-controls button {
+      margin: 0 10px;
+    }
+
+    .year-grid {
+      display: grid;
+      grid-template-columns: repeat(13, 20px);
+      gap: 10px;
+    }
+
+    .dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background-color: #444;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .dot.past {
+      background-color: #888;
+    }
+
+    .dot.current {
+      background-color: #4caf50;
+    }
+
+    .dot.completed {
+      background-color: #2196f3;
+    }
+
+    .dot:hover {
+      outline: 2px solid #4caf50;
+    }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: #1e1e1e;
+      padding: 20px;
+      border-radius: 10px;
+      color: white;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal textarea {
+      width: 300px;
+      height: 80px;
+      margin-bottom: 15px;
+      padding: 10px;
+      border-radius: 5px;
+      border: none;
+      background-color: #333;
+      color: white;
+      resize: none;
+    }
+
+    .modal button {
+      background-color: #4caf50;
+      padding: 10px;
+    }
+
+    .modal button.clear {
+      background-color: #f44336;
+    }
+
+    .modal button.cancel {
+      background-color: #9e9e9e;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 30px;
+      padding: 20px;
+      text-align: center;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <h1>PlanHaus</h1>
+
+  <div class="year-controls">
+    <button onclick="changeYear(-1)">Previous Year</button>
+    <span id="current-year"></span>
+    <button onclick="changeYear(1)">Next Year</button>
+  </div>
+
+  <div class="toolbar">
+    <button onclick="showSummary()">View Tasks</button>
+    <button onclick="exportTasks()">Export Tasks</button>
+    <button onclick="clearPlanner()">Reset Planner</button>
+  </div>
+
+  <div id="year-grid" class="year-grid"></div>
+
+  <div id="modal" class="modal">
+    <h3>Week <span id="modal-week"></span></h3>
+    <textarea id="task-input" placeholder="Enter your tasks..."></textarea>
+    <div>
+      <button onclick="saveTask()">Save</button>
+      <button class="clear" onclick="clearTask()">Clear</button>
+      <button class="cancel" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+
+  <footer>
+    <p><strong>PlanHaus: Minimalist Yearly Planner</strong></p>
+    <p>PlanHaus is your trusted, privacy-focused, dark-themed yearly planner. Simplify task management, track progress, and visualize multiple years seamlessly. All data stays secure on your device.</p>
+  </footer>
+
+  <script>
+    const yearGrid = document.getElementById('year-grid');
+    const modal = document.getElementById('modal');
+    const modalWeek = document.getElementById('modal-week');
+    const taskInput = document.getElementById('task-input');
+    const currentYearDisplay = document.getElementById('current-year');
+
+    let currentYear = new Date().getFullYear();
+    let currentWeek = getCurrentWeek();
+    let selectedWeek = null;
+    let tasks = JSON.parse(localStorage.getItem('planhaus-tasks')) || {};
+
+    function getCurrentWeek() {
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const daysPast = Math.floor((now - startOfYear) / (1000 * 60 * 60 * 24));
+      return Math.ceil((daysPast + startOfYear.getDay() + 1) / 7);
+    }
+
+    function renderYear() {
+      currentYearDisplay.textContent = currentYear;
+      yearGrid.innerHTML = '';
+      for (let week = 1; week <= 52; week++) {
+        const dot = document.createElement('div');
+        dot.className = 'dot';
+        if (week < currentWeek && currentYear === new Date().getFullYear()) {
+          dot.classList.add('past');
+        } else if (week === currentWeek && currentYear === new Date().getFullYear()) {
+          dot.classList.add('current');
+        } else if (tasks[`${currentYear}-W${week}`]) {
+          dot.style.backgroundColor = tasks[`${currentYear}-W${week}`].completed
+            ? '#2196f3'
+            : '#4caf50';
+        }
+        dot.addEventListener('click', () => openModal(week));
+        yearGrid.appendChild(dot);
+      }
+    }
+
+    function openModal(week) {
+      selectedWeek = week;
+      modalWeek.textContent = `W${week}`;
+      taskInput.value = tasks[`${currentYear}-W${week}`]?.text || '';
+      modal.classList.add('show');
+    }
+
+    function closeModal() {
+      modal.classList.remove('show');
+    }
+
+    function saveTask() {
+      const text = taskInput.value.trim();
+      tasks[`${currentYear}-W${selectedWeek}`] = { text, completed: false };
+      localStorage.setItem('planhaus-tasks', JSON.stringify(tasks));
+      renderYear();
+      closeModal();
+    }
+
+    function clearTask() {
+      delete tasks[`${currentYear}-W${selectedWeek}`];
+      localStorage.setItem('planhaus-tasks', JSON.stringify(tasks));
+      renderYear();
+      closeModal();
+    }
+
+    function changeYear(offset) {
+      currentYear += offset;
+      currentWeek = getCurrentWeek();
+      renderYear();
+    }
+
+    renderYear();
+  </script>
+</body>
+</html>
